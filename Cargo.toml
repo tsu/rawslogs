@@ -1,0 +1,11 @@
+[package]
+name = "rawslogs"
+version = "0.1.0"
+authors = ["Timo Suomela <timo.suomela@reaktor.com>"]
+edition = "2018"
+
+[dependencies]
+tokio = "0.2"
+clap = "3.0.0-beta.2"
+rusoto_core = "0.45.0"
+rusoto_logs = "0.45.0"
