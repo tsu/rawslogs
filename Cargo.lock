@@ -947,6 +947,7 @@ name = "rawslogs"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "http",
  "rusoto_core",
  "rusoto_logs",
  "tokio",
