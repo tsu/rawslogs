@@ -100,11 +100,11 @@ async fn list_groups() {
                         body: _,
                         headers: _,
                     })) => throttle(),
-                    Err(error) => println!("Error: {:?}", error),
+                    Err(error) => eprintln!("Error: {:?}", error),
                 }
             }
         }
-        Err(error) => println!("Error: {:?}", error),
+        Err(error) => eprintln!("Error: {:?}", error),
     }
 
     for g in groups {
