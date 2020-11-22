@@ -15,24 +15,24 @@ struct Opts {
 enum SubCommand {
     Groups(Groups),
     Streams(Streams),
-    Get(Get),
+    Events(Events),
 }
 
-/// List cloudwatch log groups
+/// List log groups
 #[derive(Clap)]
 struct Groups {}
 
-/// List cloudwatch log streams
+/// List log streams of a log group
 #[derive(Clap)]
 struct Streams {
-    /// The name of the the aws log group
+    /// The name of the log group
     group: String,
 }
 
-/// Get the log events of an aws log group
+/// List log events of a log group
 #[derive(Clap)]
-struct Get {
-    /// The name of the the aws log group
+struct Events {
+    /// The name of the the log group
     group: String,
     /// Only show events that are newer than 'start'
     #[clap(short, long, default_value = "1 hour ago")]
@@ -51,6 +51,6 @@ async fn main() {
     match opts.subcmd {
         SubCommand::Groups(_) => rawslogs::list_groups().await,
         SubCommand::Streams(s) => rawslogs::list_streams(s.group).await,
-        SubCommand::Get(g) => rawslogs::list_events(g.group, g.start, g.end).await,
+        SubCommand::Events(g) => rawslogs::list_events(g.group, g.start, g.end).await,
     }
 }
