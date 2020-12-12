@@ -4,7 +4,8 @@ use rusoto_core::{Region, RusotoError};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogGroupsError, DescribeLogGroupsRequest,
     DescribeLogGroupsResponse, DescribeLogStreamsError, DescribeLogStreamsRequest,
-    DescribeLogStreamsResponse, LogGroup, LogStream,
+    DescribeLogStreamsResponse, GetLogEventsError, GetLogEventsRequest, GetLogEventsResponse,
+    LogGroup, LogStream, OutputLogEvent,
 };
 use std::{thread, time};
 
@@ -52,6 +53,12 @@ pub async fn list_groups() {
 }
 
 pub async fn list_streams(log_group_name: String) {
+    for g in get_streams(&log_group_name).await {
+        println!("{}", g.log_stream_name.expect("mf"));
+    }
+}
+
+async fn get_streams(log_group_name: &String) -> Vec<LogStream> {
     let client = CloudWatchLogsClient::new(Region::default());
     let mut streams = Vec::<LogStream>::new();
 
@@ -87,15 +94,101 @@ pub async fn list_streams(log_group_name: String) {
         Err(error) => eprintln!("Error: {:?}", error),
     }
 
-    for g in streams {
-        println!("{}", g.log_stream_name.expect("mf"));
-    }
+    return streams;
 }
 
-pub async fn list_events(log_group_name: String, start: String, end: Option<String>) {
-    println!("get events for group {} after {}", log_group_name, start);
-    if let Some(end) = end {
-        println!("and before {}", end);
+pub async fn list_events(log_group_name: &String, start_time: i64, end_time: i64) {
+    let client = CloudWatchLogsClient::new(Region::default());
+    let mut log_events = Vec::<OutputLogEvent>::new();
+
+    for stream in get_streams(log_group_name).await {
+        match stream {
+            LogStream {
+                first_event_timestamp: _,
+                log_stream_name: Some(log_stream_name),
+                arn: _,
+                creation_time: _,
+                last_event_timestamp: _,
+                last_ingestion_time: _,
+                upload_sequence_token: _,
+            } => {
+                match get_log_events(
+                    &client,
+                    &log_group_name,
+                    &log_stream_name,
+                    start_time,
+                    end_time,
+                    None,
+                )
+                .await
+                {
+                    Ok(GetLogEventsResponse {
+                        events,
+                        next_backward_token: _,
+                        next_forward_token,
+                    }) => {
+                        if let Some(mut events) = events {
+                            log_events.append(&mut events);
+                        }
+                        let mut token = next_forward_token;
+                        let mut is_retry = false;
+                        while token.is_some() {
+                            match get_log_events(
+                                &client,
+                                &log_group_name,
+                                &log_stream_name,
+                                start_time,
+                                end_time,
+                                token.clone(),
+                            )
+                            .await
+                            {
+                                Ok(GetLogEventsResponse {
+                                    events,
+                                    next_backward_token: _,
+                                    next_forward_token,
+                                }) => {
+                                    if let Some(mut events) = events {
+                                        log_events.append(&mut events);
+                                    }
+                                    token = match (token, next_forward_token.clone()) {
+                                        (Some(current), Some(next)) if (current != next) => {
+                                            next_forward_token
+                                        }
+                                        _ if (is_retry) => {
+                                            is_retry = false;
+                                            next_forward_token
+                                        }
+                                        _ => None,
+                                    }
+                                }
+                                Err(RusotoError::Unknown(BufferedHttpResponse {
+                                    status: StatusCode::BAD_REQUEST,
+                                    body: _,
+                                    headers: _,
+                                })) => {
+                                    is_retry = true;
+                                    throttle()
+                                }
+                                Err(error) => eprintln!("Error in getting events: {:?}", error),
+                            }
+                        }
+                    }
+                    Err(error) => eprintln!("Error in getting events: {:?}", error),
+                }
+            }
+            _ => {}
+        }
+    }
+    for e in log_events {
+        match e {
+            OutputLogEvent {
+                ingestion_time: Some(ingestion_time),
+                message: Some(message),
+                timestamp: Some(timestamp),
+            } => println!("{} {} {}", ingestion_time, message, timestamp),
+            _ => {}
+        }
     }
 }
 
@@ -125,6 +218,27 @@ async fn describe_log_streams(
             log_stream_name_prefix: None,
             next_token: next_token,
             order_by: Some("LastEventTime".to_string()),
+        })
+        .await
+}
+
+async fn get_log_events(
+    client: &CloudWatchLogsClient,
+    log_group_name: &String,
+    log_stream_name: &String,
+    start_time: i64,
+    end_time: i64,
+    next_token: Option<String>,
+) -> Result<GetLogEventsResponse, RusotoError<GetLogEventsError>> {
+    client
+        .get_log_events(GetLogEventsRequest {
+            end_time: Some(end_time),
+            limit: Some(10_000),
+            log_group_name: log_group_name.clone(),
+            log_stream_name: log_stream_name.clone(),
+            next_token: next_token,
+            start_from_head: Some(true),
+            start_time: Some(start_time),
         })
         .await
 }

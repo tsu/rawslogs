@@ -679,6 +679,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ms-converter"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83117e9c7aa5c8d7b438c8fc75e236aecbf7bd260724afb15374ef1f967fc4d5"
+
+[[package]]
 name = "native-tls"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -946,8 +952,10 @@ dependencies = [
 name = "rawslogs"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "clap",
  "http",
+ "ms-converter",
  "rusoto_core",
  "rusoto_logs",
  "tokio",
