@@ -1,4 +1,6 @@
+use chrono::{NaiveDateTime, Utc};
 use http::StatusCode;
+use ms_converter::ms;
 use rusoto_core::request::BufferedHttpResponse;
 use rusoto_core::{Region, RusotoError};
 use rusoto_logs::{
@@ -10,6 +12,7 @@ use rusoto_logs::{
 use std::{thread, time};
 
 const LIMIT: i64 = 50;
+const ONE_HOUR_IN_SECONDS: i64 = 60 * 60;
 
 pub async fn list_groups() {
     let client = CloudWatchLogsClient::new(Region::default());
@@ -97,7 +100,29 @@ async fn get_streams(log_group_name: &String) -> Vec<LogStream> {
     return streams;
 }
 
-pub async fn list_events(log_group_name: &String, start_time: i64, end_time: i64) {
+pub async fn list_events(log_group_name: &String, start: Option<String>, end: Option<String>) {
+    let now = Utc::now().timestamp();
+    let start_time = now
+        - start
+            .map(|start| match ms(start) {
+                Ok(start) => start / 1000,
+                Err(_) => ONE_HOUR_IN_SECONDS,
+            })
+            .unwrap_or(ONE_HOUR_IN_SECONDS);
+    let end_time = now
+        - end
+            .map(|end| match ms(end) {
+                Ok(end) => end / 1000,
+                Err(_) => 0,
+            })
+            .unwrap_or(0);
+    eprintln!(
+        "Listing events between {} GMT and {} GMT and now is {} GMT",
+        NaiveDateTime::from_timestamp(start_time, 0),
+        NaiveDateTime::from_timestamp(end_time, 0),
+        NaiveDateTime::from_timestamp(now, 0)
+    );
+
     let client = CloudWatchLogsClient::new(Region::default());
     let mut log_events = Vec::<OutputLogEvent>::new();
 
