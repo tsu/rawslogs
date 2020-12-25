@@ -49,8 +49,17 @@ async fn main() {
         env::set_var("AWS_PROFILE", p);
     }
     match opts.subcmd {
-        SubCommand::Groups(_) => rawslogs::list_groups().await,
-        SubCommand::Streams(s) => rawslogs::list_streams(s.group).await,
-        SubCommand::Events(g) => rawslogs::list_events(&g.group, g.start, g.end).await,
+        SubCommand::Groups(_) => {
+            let params = rawslogs::ListGroupsParamsBuilder::new().build();
+            rawslogs::list_groups(params).await
+        }
+        SubCommand::Streams(s) => {
+            let params = rawslogs::ListStreamsParamsBuilder::new(s.group).build();
+            rawslogs::list_streams(params).await
+        }
+        SubCommand::Events(g) => {
+            let params = rawslogs::ListEventsParamsBuilder::new(g.group, g.start, g.end).build();
+            rawslogs::list_events(params).await
+        }
     }
 }

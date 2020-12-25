@@ -14,8 +14,26 @@ use std::{thread, time};
 const LIMIT: i64 = 50;
 const ONE_HOUR_IN_SECONDS: i64 = 60 * 60;
 
-pub async fn list_groups() {
-    let client = CloudWatchLogsClient::new(Region::default());
+pub struct ListGroupsParams {
+    client: CloudWatchLogsClient,
+}
+
+pub struct ListGroupsParamsBuilder {}
+
+impl ListGroupsParamsBuilder {
+    pub fn new() -> ListGroupsParamsBuilder {
+        ListGroupsParamsBuilder {}
+    }
+
+    pub fn build(self) -> ListGroupsParams {
+        return ListGroupsParams {
+            client: CloudWatchLogsClient::new(Region::default()),
+        };
+    }
+}
+
+pub async fn list_groups(params: ListGroupsParams) {
+    let client = params.client;
     let mut groups = Vec::<LogGroup>::new();
 
     match describe_log_groups(&client, None).await {
@@ -55,14 +73,38 @@ pub async fn list_groups() {
     }
 }
 
-pub async fn list_streams(log_group_name: String) {
-    for g in get_streams(&log_group_name).await {
+pub struct ListStreamsParams {
+    log_group_name: String,
+    client: CloudWatchLogsClient,
+}
+
+pub struct ListStreamsParamsBuilder {
+    log_group_name: String,
+}
+
+impl ListStreamsParamsBuilder {
+    pub fn new(log_group_name: String) -> ListStreamsParamsBuilder {
+        ListStreamsParamsBuilder { log_group_name }
+    }
+
+    pub fn build(self) -> ListStreamsParams {
+        return ListStreamsParams {
+            log_group_name: self.log_group_name,
+            client: CloudWatchLogsClient::new(Region::default()),
+        };
+    }
+}
+
+pub async fn list_streams(params: ListStreamsParams) {
+    let client = params.client;
+    let log_group_name = params.log_group_name;
+
+    for g in get_streams(&client, &log_group_name).await {
         println!("{}", g.log_stream_name.expect("mf"));
     }
 }
 
-async fn get_streams(log_group_name: &String) -> Vec<LogStream> {
-    let client = CloudWatchLogsClient::new(Region::default());
+async fn get_streams(client: &CloudWatchLogsClient, log_group_name: &String) -> Vec<LogStream> {
     let mut streams = Vec::<LogStream>::new();
 
     match describe_log_streams(&client, &log_group_name, None).await {
@@ -100,7 +142,47 @@ async fn get_streams(log_group_name: &String) -> Vec<LogStream> {
     return streams;
 }
 
-pub async fn list_events(log_group_name: &String, start: Option<String>, end: Option<String>) {
+pub struct ListEventsParams {
+    log_group_name: String,
+    start: Option<String>,
+    end: Option<String>,
+    client: CloudWatchLogsClient,
+}
+
+pub struct ListEventsParamsBuilder {
+    log_group_name: String,
+    start: Option<String>,
+    end: Option<String>,
+}
+
+impl ListEventsParamsBuilder {
+    pub fn new(
+        log_group_name: String,
+        start: Option<String>,
+        end: Option<String>,
+    ) -> ListEventsParamsBuilder {
+        ListEventsParamsBuilder {
+            log_group_name,
+            start,
+            end,
+        }
+    }
+
+    pub fn build(self) -> ListEventsParams {
+        return ListEventsParams {
+            log_group_name: self.log_group_name,
+            start: self.start,
+            end: self.end,
+            client: CloudWatchLogsClient::new(Region::default()),
+        };
+    }
+}
+
+pub async fn list_events(params: ListEventsParams) {
+    let client = params.client;
+    let log_group_name = params.log_group_name;
+    let start = params.start;
+    let end = params.end;
     let now = Utc::now().timestamp();
     let start_time = now
         - start
@@ -123,10 +205,9 @@ pub async fn list_events(log_group_name: &String, start: Option<String>, end: Op
         NaiveDateTime::from_timestamp(now, 0)
     );
 
-    let client = CloudWatchLogsClient::new(Region::default());
     let mut log_events = Vec::<OutputLogEvent>::new();
 
-    for stream in get_streams(log_group_name).await {
+    for stream in get_streams(&client, &log_group_name).await {
         match stream {
             LogStream {
                 first_event_timestamp: _,
