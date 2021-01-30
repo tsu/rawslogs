@@ -22,6 +22,7 @@ pub struct ListGroupsParams {
 }
 
 pub struct ListGroupsParamsBuilder {
+    client: Option<CloudWatchLogsClient>,
     out: Option<Box<dyn Write>>,
     err: Option<Box<dyn Write>>,
 }
@@ -29,9 +30,15 @@ pub struct ListGroupsParamsBuilder {
 impl ListGroupsParamsBuilder {
     pub fn new() -> ListGroupsParamsBuilder {
         ListGroupsParamsBuilder {
+            client: None,
             out: None,
             err: None,
         }
+    }
+
+    pub fn with_client(mut self, client: CloudWatchLogsClient) -> ListGroupsParamsBuilder {
+        self.client = Some(client);
+        self
     }
 
     pub fn with_out(mut self, out: Box<dyn Write>) -> ListGroupsParamsBuilder {
@@ -46,7 +53,9 @@ impl ListGroupsParamsBuilder {
 
     pub fn build(self) -> ListGroupsParams {
         return ListGroupsParams {
-            client: CloudWatchLogsClient::new(Region::default()),
+            client: self
+                .client
+                .unwrap_or(CloudWatchLogsClient::new(Region::default())),
             out: self.out.unwrap_or(Box::new(stdout())),
             err: self.err.unwrap_or(Box::new(stderr())),
         };
@@ -109,6 +118,7 @@ pub struct ListStreamsParams {
 
 pub struct ListStreamsParamsBuilder {
     log_group_name: String,
+    client: Option<CloudWatchLogsClient>,
     out: Option<Box<dyn Write>>,
     err: Option<Box<dyn Write>>,
 }
@@ -117,9 +127,15 @@ impl ListStreamsParamsBuilder {
     pub fn new(log_group_name: String) -> ListStreamsParamsBuilder {
         ListStreamsParamsBuilder {
             log_group_name,
+            client: None,
             out: None,
             err: None,
         }
+    }
+
+    pub fn with_client(mut self, client: CloudWatchLogsClient) -> ListStreamsParamsBuilder {
+        self.client = Some(client);
+        self
     }
 
     pub fn with_out(mut self, out: Box<dyn Write>) -> ListStreamsParamsBuilder {
@@ -135,7 +151,9 @@ impl ListStreamsParamsBuilder {
     pub fn build(self) -> ListStreamsParams {
         return ListStreamsParams {
             log_group_name: self.log_group_name,
-            client: CloudWatchLogsClient::new(Region::default()),
+            client: self
+                .client
+                .unwrap_or(CloudWatchLogsClient::new(Region::default())),
             out: self.out.unwrap_or(Box::new(stdout())),
             err: self.err.unwrap_or(Box::new(stderr())),
         };
@@ -212,6 +230,7 @@ pub struct ListEventsParamsBuilder {
     log_group_name: String,
     start: Option<String>,
     end: Option<String>,
+    client: Option<CloudWatchLogsClient>,
     out: Option<Box<dyn Write>>,
     err: Option<Box<dyn Write>>,
 }
@@ -226,9 +245,15 @@ impl ListEventsParamsBuilder {
             log_group_name,
             start,
             end,
+            client: None,
             out: None,
             err: None,
         }
+    }
+
+    pub fn with_client(mut self, client: CloudWatchLogsClient) -> ListEventsParamsBuilder {
+        self.client = Some(client);
+        self
     }
 
     pub fn with_out(mut self, out: Box<dyn Write>) -> ListEventsParamsBuilder {
@@ -246,7 +271,9 @@ impl ListEventsParamsBuilder {
             log_group_name: self.log_group_name,
             start: self.start,
             end: self.end,
-            client: CloudWatchLogsClient::new(Region::default()),
+            client: self
+                .client
+                .unwrap_or(CloudWatchLogsClient::new(Region::default())),
             out: self.out.unwrap_or(Box::new(stdout())),
             err: self.err.unwrap_or(Box::new(stderr())),
         };
