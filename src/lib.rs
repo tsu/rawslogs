@@ -9,6 +9,7 @@ use rusoto_logs::{
     DescribeLogStreamsResponse, GetLogEventsError, GetLogEventsRequest, GetLogEventsResponse,
     LogGroup, LogStream, OutputLogEvent,
 };
+use std::io::{stderr, stdout, Write};
 use std::{thread, time};
 
 const LIMIT: i64 = 50;
@@ -16,24 +17,46 @@ const ONE_HOUR_IN_SECONDS: i64 = 60 * 60;
 
 pub struct ListGroupsParams {
     client: CloudWatchLogsClient,
+    out: Box<dyn Write>,
+    err: Box<dyn Write>,
 }
 
-pub struct ListGroupsParamsBuilder {}
+pub struct ListGroupsParamsBuilder {
+    out: Option<Box<dyn Write>>,
+    err: Option<Box<dyn Write>>,
+}
 
 impl ListGroupsParamsBuilder {
     pub fn new() -> ListGroupsParamsBuilder {
-        ListGroupsParamsBuilder {}
+        ListGroupsParamsBuilder {
+            out: None,
+            err: None,
+        }
+    }
+
+    pub fn with_out(mut self, out: Box<dyn Write>) -> ListGroupsParamsBuilder {
+        self.out = Some(out);
+        self
+    }
+
+    pub fn with_err(mut self, err: Box<dyn Write>) -> ListGroupsParamsBuilder {
+        self.err = Some(err);
+        self
     }
 
     pub fn build(self) -> ListGroupsParams {
         return ListGroupsParams {
             client: CloudWatchLogsClient::new(Region::default()),
+            out: self.out.unwrap_or(Box::new(stdout())),
+            err: self.err.unwrap_or(Box::new(stderr())),
         };
     }
 }
 
 pub async fn list_groups(params: ListGroupsParams) {
     let client = params.client;
+    let mut out = params.out;
+    let mut err = params.err;
     let mut groups = Vec::<LogGroup>::new();
 
     match describe_log_groups(&client, None).await {
@@ -61,50 +84,80 @@ pub async fn list_groups(params: ListGroupsParams) {
                         body: _,
                         headers: _,
                     })) => throttle(),
-                    Err(error) => eprintln!("Error: {:?}", error),
+                    Err(error) => {
+                        let _ = writeln!(err, "Error: {:?}", error);
+                    }
                 }
             }
         }
-        Err(error) => eprintln!("Error: {:?}", error),
+        Err(error) => {
+            let _ = writeln!(err, "Error: {:?}", error);
+        }
     }
 
     for g in groups {
-        println!("{}", g.log_group_name.expect("mf"));
+        let _ = writeln!(out, "{}", g.log_group_name.expect("mf"));
     }
 }
 
 pub struct ListStreamsParams {
     log_group_name: String,
     client: CloudWatchLogsClient,
+    out: Box<dyn Write>,
+    err: Box<dyn Write>,
 }
 
 pub struct ListStreamsParamsBuilder {
     log_group_name: String,
+    out: Option<Box<dyn Write>>,
+    err: Option<Box<dyn Write>>,
 }
 
 impl ListStreamsParamsBuilder {
     pub fn new(log_group_name: String) -> ListStreamsParamsBuilder {
-        ListStreamsParamsBuilder { log_group_name }
+        ListStreamsParamsBuilder {
+            log_group_name,
+            out: None,
+            err: None,
+        }
+    }
+
+    pub fn with_out(mut self, out: Box<dyn Write>) -> ListStreamsParamsBuilder {
+        self.out = Some(out);
+        self
+    }
+
+    pub fn with_err(mut self, err: Box<dyn Write>) -> ListStreamsParamsBuilder {
+        self.err = Some(err);
+        self
     }
 
     pub fn build(self) -> ListStreamsParams {
         return ListStreamsParams {
             log_group_name: self.log_group_name,
             client: CloudWatchLogsClient::new(Region::default()),
+            out: self.out.unwrap_or(Box::new(stdout())),
+            err: self.err.unwrap_or(Box::new(stderr())),
         };
     }
 }
 
 pub async fn list_streams(params: ListStreamsParams) {
     let client = params.client;
+    let mut out = params.out;
+    let mut err = params.err;
     let log_group_name = params.log_group_name;
 
-    for g in get_streams(&client, &log_group_name).await {
-        println!("{}", g.log_stream_name.expect("mf"));
+    for g in get_streams(&client, &mut err, &log_group_name).await {
+        let _ = writeln!(out, "{}", g.log_stream_name.expect("mf"));
     }
 }
 
-async fn get_streams(client: &CloudWatchLogsClient, log_group_name: &String) -> Vec<LogStream> {
+async fn get_streams(
+    client: &CloudWatchLogsClient,
+    err: &mut Box<dyn Write>,
+    log_group_name: &String,
+) -> Vec<LogStream> {
     let mut streams = Vec::<LogStream>::new();
 
     match describe_log_streams(&client, &log_group_name, None).await {
@@ -132,11 +185,15 @@ async fn get_streams(client: &CloudWatchLogsClient, log_group_name: &String) -> 
                         body: _,
                         headers: _,
                     })) => throttle(),
-                    Err(error) => eprintln!("Error: {:?}", error),
+                    Err(error) => {
+                        let _ = writeln!(err, "Error: {:?}", error);
+                    }
                 }
             }
         }
-        Err(error) => eprintln!("Error: {:?}", error),
+        Err(error) => {
+            let _ = writeln!(err, "Error: {:?}", error);
+        }
     }
 
     return streams;
@@ -147,12 +204,16 @@ pub struct ListEventsParams {
     start: Option<String>,
     end: Option<String>,
     client: CloudWatchLogsClient,
+    out: Box<dyn Write>,
+    err: Box<dyn Write>,
 }
 
 pub struct ListEventsParamsBuilder {
     log_group_name: String,
     start: Option<String>,
     end: Option<String>,
+    out: Option<Box<dyn Write>>,
+    err: Option<Box<dyn Write>>,
 }
 
 impl ListEventsParamsBuilder {
@@ -165,7 +226,19 @@ impl ListEventsParamsBuilder {
             log_group_name,
             start,
             end,
+            out: None,
+            err: None,
         }
+    }
+
+    pub fn with_out(mut self, out: Box<dyn Write>) -> ListEventsParamsBuilder {
+        self.out = Some(out);
+        self
+    }
+
+    pub fn with_err(mut self, err: Box<dyn Write>) -> ListEventsParamsBuilder {
+        self.err = Some(err);
+        self
     }
 
     pub fn build(self) -> ListEventsParams {
@@ -174,6 +247,8 @@ impl ListEventsParamsBuilder {
             start: self.start,
             end: self.end,
             client: CloudWatchLogsClient::new(Region::default()),
+            out: self.out.unwrap_or(Box::new(stdout())),
+            err: self.err.unwrap_or(Box::new(stderr())),
         };
     }
 }
@@ -181,6 +256,8 @@ impl ListEventsParamsBuilder {
 pub async fn list_events(params: ListEventsParams) {
     let client = params.client;
     let log_group_name = params.log_group_name;
+    let mut out = params.out;
+    let mut err = params.err;
     let start = params.start;
     let end = params.end;
     let now = Utc::now().timestamp();
@@ -198,7 +275,8 @@ pub async fn list_events(params: ListEventsParams) {
                 Err(_) => 0,
             })
             .unwrap_or(0);
-    eprintln!(
+    let _ = writeln!(
+        err,
         "Listing events between {} GMT and {} GMT and now is {} GMT",
         NaiveDateTime::from_timestamp(start_time, 0),
         NaiveDateTime::from_timestamp(end_time, 0),
@@ -207,7 +285,7 @@ pub async fn list_events(params: ListEventsParams) {
 
     let mut log_events = Vec::<OutputLogEvent>::new();
 
-    for stream in get_streams(&client, &log_group_name).await {
+    for stream in get_streams(&client, &mut err, &log_group_name).await {
         match stream {
             LogStream {
                 first_event_timestamp: _,
@@ -276,11 +354,15 @@ pub async fn list_events(params: ListEventsParams) {
                                     is_retry = true;
                                     throttle()
                                 }
-                                Err(error) => eprintln!("Error in getting events: {:?}", error),
+                                Err(error) => {
+                                    let _ = writeln!(err, "Error in getting events: {:?}", error);
+                                }
                             }
                         }
                     }
-                    Err(error) => eprintln!("Error in getting events: {:?}", error),
+                    Err(error) => {
+                        let _ = writeln!(err, "Error in getting events: {:?}", error);
+                    }
                 }
             }
             _ => {}
@@ -292,7 +374,9 @@ pub async fn list_events(params: ListEventsParams) {
                 ingestion_time: Some(ingestion_time),
                 message: Some(message),
                 timestamp: Some(timestamp),
-            } => println!("{} {} {}", ingestion_time, message, timestamp),
+            } => {
+                let _ = writeln!(out, "{} {} {}", ingestion_time, message, timestamp);
+            }
             _ => {}
         }
     }
