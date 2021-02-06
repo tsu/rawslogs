@@ -1,4 +1,4 @@
-![ci](https://github.com/tsu/rawslogs/workflows/Rust/badge.svg)
+![build](https://github.com/tsu/rawslogs/workflows/build/badge.svg)
 ```
 USAGE:
     rawslogs [OPTIONS] <SUBCOMMAND>
