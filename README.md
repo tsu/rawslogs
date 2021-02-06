@@ -1,3 +1,4 @@
+![ci](https://github.com/tsu/rawslogs/workflows/Rust/badge.svg)
 ```
 USAGE:
     rawslogs [OPTIONS] <SUBCOMMAND>
